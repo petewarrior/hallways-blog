@@ -1,0 +1,7 @@
+{
+    "title": "My 3D Blog",
+    "description": "A blog you can walk through",
+    "recentPostsCount": 5,
+    "postThreshold": 20,
+    "accentColor": "#4A90D9"
+}
