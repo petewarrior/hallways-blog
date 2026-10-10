@@ -9,6 +9,8 @@ class Navigation {
         this.doorways = options.doorways || [];
         this.boundaries = options.boundaries || [];
         this.onEnterPost = options.onEnterPost || (() => {});
+        this.onApproachPost = options.onApproachPost || (() => {});
+        this.onCancelApproach = options.onCancelApproach || (() => {});
         this.onReturnToLobby = options.onReturnToLobby || (() => {});
         
         this.currentRoom = 'lobby';
@@ -17,6 +19,7 @@ class Navigation {
         this.transitionCallbacks = [];
         this.keys = new Set();
         this.previousDistances = new Map();
+        this.prewarmedDoorway = null;
         this.corridorEnd = null;
         this.previousCorridorZ = null;
         this.lastFrame = performance.now();
@@ -78,7 +81,7 @@ class Navigation {
                 const distance = offsetX * boundary.normalX + offsetZ * boundary.normalZ;
                 const tangentDistance = offsetX * boundary.tangentX + offsetZ * boundary.tangentZ;
                 const inOpening = boundary.width && Math.abs(tangentDistance) < boundary.width / 2 - 0.2;
-                if (distance > boundary.apothem - 0.2 && !inOpening) {
+                if (distance > -0.34 && !inOpening) {
                     position.x = previousX;
                     position.z = previousZ;
                     this.rig.object3D.updateMatrixWorld(true);
@@ -107,10 +110,19 @@ class Navigation {
             const offsetZ = position.z - doorway.z;
             const distance = offsetX * doorway.normalX + offsetZ * doorway.normalZ;
             const tangentDistance = offsetX * doorway.tangentX + offsetZ * doorway.tangentZ;
+            const alignedWithDoor = Math.abs(tangentDistance) <= doorway.width / 2 - 0.2;
             const previous = this.previousDistances.get(index) ?? distance;
             this.previousDistances.set(index, distance);
 
-            if (previous < -0.55 && distance >= -0.55 && Math.abs(tangentDistance) <= doorway.width / 2) {
+            if (this.prewarmedDoorway === doorway && (distance < -3.5 || !alignedWithDoor)) {
+                this.prewarmedDoorway = null;
+                this.onCancelApproach(doorway);
+            }
+            if (!this.prewarmedDoorway && alignedWithDoor && distance >= -2.5 && distance < 0.75) {
+                this.prewarmedDoorway = doorway;
+                this.onApproachPost(doorway.post, doorway);
+            }
+            if (previous < 0.75 && distance >= 0.75 && alignedWithDoor) {
                 this.enterDoorway(doorway);
                 return;
             }
@@ -122,6 +134,7 @@ class Navigation {
         this.currentRoom = 'hallway';
         this.roomHistory = ['lobby', doorway.post.id];
         this.activeDoorway = doorway;
+        this.prewarmedDoorway = null;
         this.previousDistances.clear();
         this.onEnterPost(doorway.post, doorway);
         const worldPosition = this.rig.object3D.getWorldPosition(new THREE.Vector3());
