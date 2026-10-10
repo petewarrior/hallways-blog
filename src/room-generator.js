@@ -164,6 +164,29 @@ class RoomGenerator {
         this.canvasPlane.setAttribute('height', '2.3');
         this.canvasPlane.setAttribute('material', 'shader: flat; src: #post-canvas; side: double');
         this.roomContainer.appendChild(this.canvasPlane);
+
+        const scrollbar = document.createElement('a-entity');
+        scrollbar.setAttribute('position', `1.81 2 ${corridorEnd - depth + 0.16}`);
+        scrollbar.setAttribute('post-scrollbar', 'range: 0.92');
+
+        const track = document.createElement('a-box');
+        track.classList.add('post-scrollbar-track', 'scrollable');
+        track.setAttribute('position', '0 0 0');
+        track.setAttribute('width', '0.08');
+        track.setAttribute('height', '2');
+        track.setAttribute('depth', '0.04');
+        track.setAttribute('color', '#77796F');
+        scrollbar.appendChild(track);
+
+        const thumb = document.createElement('a-box');
+        thumb.classList.add('post-scrollbar-thumb', 'scrollable');
+        thumb.setAttribute('position', '0 0.92 0.07');
+        thumb.setAttribute('width', '0.26');
+        thumb.setAttribute('height', '0.2');
+        thumb.setAttribute('depth', '0.12');
+        thumb.setAttribute('color', '#B35C3A');
+        scrollbar.appendChild(thumb);
+        this.roomContainer.appendChild(scrollbar);
     }
 
     refreshCanvasTexture() {
