@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Blog</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
 </head>
 <body class="is-preloading">
     <div id="loading-screen" role="status" aria-live="polite">
@@ -25,7 +25,10 @@
 
         <a-entity id="rig" position="0 0 0">
             <a-entity id="camera" camera look-controls position="0 1.6 0">
+                <a-entity cursor="fuse: false; rayOrigin: mouse" raycaster="objects: .scrollable; far: 100"></a-entity>
             </a-entity>
+            <a-entity id="left-controller" laser-controls="hand: left" raycaster="objects: .scrollable; far: 12"></a-entity>
+            <a-entity id="right-controller" laser-controls="hand: right" raycaster="objects: .scrollable; far: 12"></a-entity>
         </a-entity>
 
         <a-entity id="hallway-preloader" gltf-model="#hallway-model" visible="false"></a-entity>
@@ -42,6 +45,7 @@
     </a-scene>
 
     <canvas id="post-canvas" width="1200" height="800" aria-hidden="true"></canvas>
+    <script src="src/post-scrollbar.js"></script>
     <script type="module" src="main.js"></script>
 </body>
 </html>
