@@ -5,43 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Blog</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
 </head>
-<body>
+<body class="is-preloading">
+    <div id="loading-screen" role="status" aria-live="polite">
+        <span id="loading-status">Preparing the hallway...</span>
+    </div>
     <div id="ui-overlay">
-        <div id="back-button" class="hidden">
-            <span>← Back</span>
-        </div>
+        <button id="back-button" class="hidden" type="button" aria-label="Return to lobby">← Back</button>
         <div id="room-label">LOBBY</div>
     </div>
 
-    <a-scene id="scene" fog="type: linear; color: #DDD; near: 10; far: 50" 
-             renderer="antialias: true">
-        
+    <a-scene id="scene" fog="type: linear; color: #CCC; near: 15; far: 100"
+             renderer="antialias: true; colorManagement: true;">
+
         <a-assets>
             <a-asset-item id="hallway-model" src="assets/models/hallway_4x4x10/hallway_4x4x10.gltf"></a-asset-item>
         </a-assets>
 
         <a-entity id="rig" position="0 0 0">
-            <a-entity id="camera" camera look-controls wasd-controls position="0 1.6 0">
-                <a-entity cursor="fuse: false; rayOrigin: mouse" raycaster="objects: .clickable; far: 50"></a-entity>
+            <a-entity id="camera" camera look-controls position="0 1.6 0">
             </a-entity>
         </a-entity>
 
-        <a-entity id="hallway-container" position="0 0 -10">
-            <a-cylinder position="0 0.05 0" radius="2" height="0.1" color="#AAA" segments-radial="16"></a-cylinder>
-            <a-text value="Walk forward to enter" position="0 2 0" align="center" width="8" color="#888"></a-text>
+        <a-entity id="hallway-preloader" gltf-model="#hallway-model" visible="false"></a-entity>
+
+        <a-entity id="lobby-container"></a-entity>
+
+        <a-entity id="hallway-container" visible="false">
+            <a-entity id="room-container"></a-entity>
         </a-entity>
-        
-        <a-entity id="lobby-room"></a-entity>
-        <a-entity id="category-room" visible="false"></a-entity>
-        
+
         <a-sky color="#ECECEC"></a-sky>
-        <a-entity light="type: ambient; color: #FFF; intensity: 0.6"></a-entity>
-        <a-entity light="type: directional; color: #FFF; intensity: 0.4" position="1 2 1"></a-entity>
+        <a-entity light="type: ambient; color: #FFF; intensity: 0.8"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.6" position="1 3 1"></a-entity>
     </a-scene>
 
-    <script src="src/post-panel.js"></script>
+    <canvas id="post-canvas" width="1200" height="800" aria-hidden="true"></canvas>
     <script type="module" src="main.js"></script>
 </body>
 </html>

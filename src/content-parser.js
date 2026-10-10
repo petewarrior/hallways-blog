@@ -70,11 +70,13 @@ async function parseMarkdownFile(filePath) {
         
         return {
             id: slugify(metadata.title || filePath),
+            path: filePath,
             title: metadata.title || 'Untitled',
             date: metadata.date || '',
             category: metadata.category || 'uncategorized',
             excerpt: metadata.excerpt || body.substring(0, 150) + '...',
             image: metadata.image || '',
+            markdown: body,
             body: convertMarkdownToHtml(body)
         };
     } catch (error) {
@@ -83,21 +85,25 @@ async function parseMarkdownFile(filePath) {
     }
 }
 
-const allMarkdownFiles = [
-    'getting-started-with-3d-web.md',
-    'accessible-3d-web.md',
-    'optimizing-webgl.md',
-    'multiplayer-3d.md',
-    'vr-in-education.md',
-    'spatial-computing.md'
-];
-
 async function parseContent(postsPath) {
     const posts = [];
     const categories = new Map();
-    
-    for (const file of allMarkdownFiles) {
-        const post = await parseMarkdownFile(`${postsPath}/${file}`);
+
+    const manifestResponse = await fetch(`${postsPath}/index.json`);
+    if (!manifestResponse.ok) {
+        throw new Error(`Failed to load post manifest: ${manifestResponse.status}`);
+    }
+
+    const files = await manifestResponse.json();
+    if (!Array.isArray(files) || files.some(file => typeof file !== 'string')) {
+        throw new Error('Post manifest must be an array of Markdown filenames');
+    }
+
+    const parsedPosts = await Promise.all(
+        files.map(file => parseMarkdownFile(`${postsPath}/${file}`))
+    );
+
+    for (const post of parsedPosts) {
         if (post) {
             posts.push(post);
             
