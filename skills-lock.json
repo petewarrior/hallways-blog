@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "aframe-webxr": {
+      "source": "freshtechbro/claudedesignskills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/aframe-webxr/SKILL.md",
+      "computedHash": "805628258210c6504bcab36dd3407c99d1d0e1d44d17f8a8bdbbb706460c2306"
+    }
+  }
+}
