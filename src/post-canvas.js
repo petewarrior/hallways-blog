@@ -276,6 +276,13 @@ class PostCanvas {
         this.draw();
     }
 
+    scrollToRatio(ratio) {
+        const next = Math.max(0, Math.min(1, ratio)) * this.maxScroll;
+        if (Math.abs(next - this.scrollY) < 1) return;
+        this.scrollY = next;
+        this.draw();
+    }
+
     clear() {
         this.active = false;
         this.scrollY = 0;
