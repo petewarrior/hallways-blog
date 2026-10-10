@@ -4,22 +4,15 @@ A blog you can walk through, built with A-Frame.
 
 ## Features
 
-- **Loading visualization**: Hallway extends as content loads
-- **Dashboard**: Central room with recent posts and category halls
-- **Category rooms**: Polygon rooms for ≤20 posts, corridors for >20
-- **Post rooms**: Entry corridor → text wall → floating images
-- **Navigation**: WASD + mouse, click-to-teleport, physical hallways
-- **VR Support**: Works with VR headsets via WebXR
+- **Dynamic lobby**: A polygon lobby grows with the post count and gives every post its own doorway
+- **Walk-through navigation**: WASD or arrow keys move through doors; mouse movement looks around
+- **Streaming hallways**: GLTF hallway segments extend ahead while post content and images load
+- **Reading rooms**: Each post ends in a cubical room with a scrollable, canvas-textured article plane
+- **Image fallbacks**: Cross-origin images that fail to load appear as placeholders
 
 ## Quick Start
 
-### 1. Install dependencies (optional, for dev features)
-
-```bash
-npm install
-```
-
-### 2. Start a local server
+### Start a local server
 
 Due to ES modules and cross-origin restrictions, you need a local server:
 
@@ -34,7 +27,7 @@ npx serve .
 php -S localhost:8000
 ```
 
-### 3. Open in browser
+### Open in browser
 
 Navigate to `http://localhost:8000`
 
@@ -42,10 +35,12 @@ Navigate to `http://localhost:8000`
 
 | Action | Desktop | VR |
 |--------|---------|-----|
-| Move | WASD | Thumbstick/trackpad |
-| Look | Mouse drag | Head tracking |
-| Select | Click | Gaze + controller trigger |
-| Go Back | Click UI button / Esc | Controller button |
+| Action | Desktop |
+|--------|---------|
+| Move | WASD or arrow keys; hold Shift to move faster |
+| Look | Mouse movement |
+| Read | Mouse wheel or Page Up/Page Down in a post room |
+| Return | Walk back through the hallway, click Back, or press Esc |
 
 ## Project Structure
 
@@ -57,15 +52,16 @@ Navigate to `http://localhost:8000`
 ├── server-proxy.js         - WordPress proxy (optional)
 │
 ├── content/
-│   ├── config.json         - Site configuration
-│   └── posts/              - Markdown blog posts
+│   └── posts/
+│       ├── index.json      - Static list of Markdown posts
+│       └── *.md            - Markdown blog posts
 │
 ├── src/
 │   ├── content-parser.js   - Parse markdown to posts
 │   ├── room-generator.js   - Create 3D rooms
 │   ├── hallway-loader.js   - Loading hallway extension
-│   ├── navigation.js       - WASD, room transitions
-│   └── post-panel.js       - A-Frame components
+│   ├── navigation.js       - Rig movement and doorway transitions
+│   └── post-canvas.js      - Draw and scroll article content
 │
 └── assets/
     └── models/             - GLTF models
@@ -97,33 +93,17 @@ Your post content here. Supports **markdown** formatting.
 ```code blocks``` too!
 ```
 
-### Categories
-
-Categories are auto-generated based on the `category` field in posts. Posts with the same category appear together.
-
-### Configuration
-
-Edit `content/config.json`:
-
-```json
-{
-    "title": "My 3D Blog",
-    "description": "A blog you can walk through",
-    "recentPostsCount": 5,
-    "postThreshold": 20,
-    "accentColor": "#4A90D9"
-}
-```
+Add each Markdown filename to `content/posts/index.json` so the static app can discover it. Browsers cannot enumerate a static directory, so a new post must be listed in the manifest.
 
 ## Room Types
 
-| Room | Trigger | Layout |
-|------|---------|--------|
-| **Loading** | Page loading | Hallway extends ahead |
-| **Dashboard** | Enter after loading | Central platform, 5 recent posts, N category halls |
-| **Category (≤20 posts)** | Enter category hall | N-gon polygon, 1 entryway per side |
-| **Category (>20 posts)** | Enter category hall | Straight corridor, n/2 entryways per side |
-| **Post** | Enter post corridor | Entry corridor → text wall → floating images |
+| Area | Behavior |
+|------|----------|
+| **Lobby** | One doorway per post; at least three sides when there are one or two posts |
+| **Hallway** | Repeated 4x4x10 GLTF segments extend as the reader walks forward |
+| **Reading room** | A 4x4x4 room with the article drawn on a scrollable canvas plane |
+
+With no posts, the lobby displays an empty state. Images are loaded with CORS enabled; if a remote host disallows canvas use or an image fails, its placeholder is shown instead.
 
 ## WordPress Integration
 
