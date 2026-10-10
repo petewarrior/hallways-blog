@@ -13,15 +13,27 @@ export class HallwayLoader {
     }
 
     start(doorway) {
+        this.preview(doorway);
+        this.prewarmed = false;
+    }
+
+    preview(doorway) {
+        if (this.active && this.activePostId === doorway.post.id) return;
         this.stop();
         this.active = true;
         this.isLoading = true;
+        this.prewarmed = true;
+        this.activePostId = doorway.post.id;
         this.container.setAttribute('position', `${doorway.x} 0 ${doorway.z}`);
         this.container.setAttribute('rotation', `0 ${doorway.rotationY} 0`);
         this.container.setAttribute('visible', 'true');
         this.appendSegment();
         this.appendSegment();
         this.positionTimer = setInterval(() => this.extendAhead(), 100);
+    }
+
+    cancelPreview(doorway) {
+        if (this.prewarmed && this.activePostId === doorway.post.id) this.stop();
     }
 
     extendHallway() {
@@ -80,6 +92,8 @@ export class HallwayLoader {
         this.active = false;
         this.isLoading = false;
         this.segmentCount = 0;
+        this.prewarmed = false;
+        this.activePostId = null;
         this.segments.forEach(segment => segment.remove());
         this.segments = [];
         if (this.container) this.container.setAttribute('visible', 'false');

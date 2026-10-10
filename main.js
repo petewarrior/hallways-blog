@@ -42,6 +42,8 @@ class BlogApp {
             hallwayContainer: this.hallwayContainer,
             doorways,
             boundaries: this.roomGenerator.boundaries,
+            onApproachPost: (_post, doorway) => this.hallwayLoader.preview(doorway),
+            onCancelApproach: doorway => this.hallwayLoader.cancelPreview(doorway),
             onEnterPost: (post, doorway) => this.beginPost(post, doorway),
             onReturnToLobby: () => this.returnToLobby()
         });
