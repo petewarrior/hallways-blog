@@ -1,3 +1,73 @@
+AFRAME.registerComponent('doorway-fog', {
+    schema: {
+        width: { type: 'number', default: 2.1 },
+        height: { type: 'number', default: 2.8 }
+    },
+
+    init() {
+        const geometry = new THREE.PlaneGeometry(this.data.width, this.data.height);
+        const material = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0 } },
+            vertexShader: `
+                varying vec2 vUv;
+
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                varying vec2 vUv;
+
+                float hash(vec2 point) {
+                    return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453);
+                }
+
+                float noise(vec2 point) {
+                    vec2 cell = floor(point);
+                    vec2 blend = fract(point);
+                    blend = blend * blend * (3.0 - 2.0 * blend);
+                    return mix(
+                        mix(hash(cell), hash(cell + vec2(1.0, 0.0)), blend.x),
+                        mix(hash(cell + vec2(0.0, 1.0)), hash(cell + vec2(1.0, 1.0)), blend.x),
+                        blend.y
+                    );
+                }
+
+                void main() {
+                    vec2 uv = vUv;
+                    vec2 drift = vec2(time * 0.012, sin(time * 0.16) * 0.08);
+                    float clouds = noise(uv * vec2(5.0, 3.5) + drift);
+                    clouds = clouds * 0.65 + noise(uv * vec2(10.0, 7.0) - drift * 1.4) * 0.35;
+                    float haze = smoothstep(0.34, 0.78, clouds);
+                    float edges = smoothstep(0.0, 0.16, uv.x) * smoothstep(0.0, 0.16, 1.0 - uv.x);
+                    edges *= smoothstep(0.0, 0.12, uv.y) * smoothstep(0.0, 0.12, 1.0 - uv.y);
+                    float alpha = haze * edges * 0.82;
+                    gl_FragColor = vec4(vec3(0.78, 0.78, 0.75), alpha);
+                }
+            `,
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        this.el.setObject3D('mesh', new THREE.Mesh(geometry, material));
+    },
+
+    tick(time) {
+        const mesh = this.el.getObject3D('mesh');
+        if (mesh) mesh.material.uniforms.time.value = time / 1000;
+    },
+
+    remove() {
+        const mesh = this.el.getObject3D('mesh');
+        if (!mesh) return;
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+        this.el.removeObject3D('mesh');
+    }
+});
+
 class RoomGenerator {
     constructor(options) {
         this.lobbyContainer = options.lobbyContainer || document.getElementById('lobby-container');
@@ -117,6 +187,12 @@ class RoomGenerator {
         lintel.setAttribute('depth', '0.24');
         lintel.setAttribute('color', '#745A43');
         frame.appendChild(lintel);
+
+        const fog = document.createElement('a-entity');
+        fog.setAttribute('doorway-fog', `width: ${width - 0.12}; height: 2.75`);
+        fog.setAttribute('position', '0 1.5 -0.16');
+        // frame.appendChild(fog);
+
         this.lobbyContainer.appendChild(frame);
 
         const title = document.createElement('a-text');
@@ -127,6 +203,14 @@ class RoomGenerator {
         title.setAttribute('width', '4.5');
         title.setAttribute('color', '#30312E');
         this.lobbyContainer.appendChild(title);
+
+        const titleBoard = document.createElement('a-plane');
+        title.appendChild(titleBoard);
+        titleBoard.setAttribute('position', '0 0 -0.01');
+        titleBoard.setAttribute('width', '4.55');
+        titleBoard.setAttribute('height', '0.6');
+        titleBoard.setAttribute('color', '#ddd');
+        
     }
 
     setLobbyVisible(visible) {
