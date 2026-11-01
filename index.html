@@ -6,6 +6,7 @@
     <title>Hallways Blog</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
+    <script src="https://cdn.rawgit.com/mrturck/aframe-joystick/master/joystick.min.js"></script>
 </head>
 <body class="is-preloading">
     <div id="loading-screen" role="status" aria-live="polite">
@@ -16,7 +17,7 @@
         <div id="room-label">LOBBY</div>
     </div>
 
-    <a-scene stats id="scene" fog="type: linear; color: #333; near: 15; far: 100"
+    <a-scene stats joystick id="scene" fog="type: linear; color: #333; near: 15; far: 100"
              renderer="antialias: true; colorManagement: true;">
 
         <a-assets>
