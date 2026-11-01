@@ -8,8 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "local-preview": "vite preview",
-    "deploy": "vite build && wrangler deploy",
-		"preview": "vite build && wrangler dev"
+    "deploy": "npm run build && wrangler deploy",
+		"preview": "npm run build && wrangler dev"
   },
   "devDependencies": {
     "vite": "^8.3.5",
