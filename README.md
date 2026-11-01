@@ -12,30 +12,35 @@ A blog you can walk through, built with A-Frame.
 
 ## Quick Start
 
-### Start a local server
+### Develop locally
 
-Due to ES modules and cross-origin restrictions, you need a local server:
+Install dependencies and start Vite:
 
 ```bash
-# Python 3
-python -m http.server 8000
-
-# Node.js
-npx serve .
-
-# PHP
-php -S localhost:8000
+pnpm install
+pnpm dev
 ```
 
-When `contentSource` is `"wordpress"`, run the image proxy in a second terminal:
+When `contentSource` is `"wordpress"`, run the local image proxy in a second terminal:
 
 ```bash
 node server-proxy.js
 ```
 
+Vite serves the app at `http://localhost:5173` and proxies `/api/image` to the local image proxy.
+
+### Build for Pages
+
+```bash
+pnpm build
+pnpm preview
+```
+
+The production build is minified into `dist/`. Deploy `dist/` to Cloudflare Pages; the root `functions/` directory provides the `/api/image` route. Set `WORDPRESS_IMAGE_ALLOWED_HOSTS` in the Pages environment for the image proxy.
+
 ### Open in browser
 
-Navigate to `http://localhost:8000`
+Navigate to the Vite URL printed by `pnpm dev` or `pnpm preview`.
 
 ## Controls
 
@@ -55,8 +60,11 @@ Navigate to `http://localhost:8000`
 ├── index.html              - Entry point, A-Frame scene
 ├── main.js                 - App initialization
 ├── styles.css              - UI styling
+├── package.json            - pnpm scripts and Vite dependency
+├── vite.config.js          - Build, static asset copying, and local API proxy
 ├── .env                    - Public WordPress API settings
 ├── server-proxy.js         - WordPress API and CORS image proxy
+├── functions/api/image.js  - Cloudflare Pages image proxy
 │
 ├── content/
 │   ├── config.json         - App settings, including the content source
@@ -126,13 +134,13 @@ Choose the content source in `content/config.json`:
 Set `contentSource` to `"wordpress"` to fetch public content from the WordPress.com REST API. Configure the API endpoint and optional parent category in `.env`:
 
 ```env
-WORDPRESS_API_BASE_URL=https://public-api.wordpress.com/wp/v2/sites/sasori39883522.wordpress.com
-WORDPRESS_PARENT_CATEGORY_ID=787237432
-WORDPRESS_IMAGE_PROXY_URL=http://localhost:3000/api/image?v=2&url=
+VITE_WORDPRESS_API_BASE_URL=https://public-api.wordpress.com/wp/v2/sites/sasori39883522.wordpress.com
+VITE_WORDPRESS_PARENT_CATEGORY_ID=787237432
+VITE_WORDPRESS_IMAGE_PROXY_URL=/api/image?v=2&url=
 WORDPRESS_IMAGE_ALLOWED_HOSTS=*.wordpress.com,*.files.wordpress.com,images.wordpress.com,i0.wp.com,images.unsplash.com,newsdig.ismcdn.jp
 ```
 
-Leave `WORDPRESS_PARENT_CATEGORY_ID` blank or omit it to load categories without a parent filter. These settings are fetched by the browser and are public; do not put credentials or secrets in `.env`. The image proxy adds the CORS headers needed for remote image textures and only fetches HTTPS URLs from `WORDPRESS_IMAGE_ALLOWED_HOSTS`. The main lobby leads to category lobbies, and each category lobby leads to its post reading rooms. WordPress requests are paginated automatically; Markdown remains the default and continues to use `content/posts/index.json`.
+Vite injects only variables prefixed with `VITE_` into the browser bundle. These values are public; never put credentials or secrets in them. `WORDPRESS_IMAGE_ALLOWED_HOSTS` is server-side configuration: set it in the Pages environment for deployment, or in `.env` for `server-proxy.js` locally. Leave `VITE_WORDPRESS_PARENT_CATEGORY_ID` blank or omit it to load categories without a parent filter. The image proxy adds the CORS headers needed for remote image textures and only fetches HTTPS URLs from the allowlist. The main lobby leads to category lobbies, and each category lobby leads to its post reading rooms. WordPress requests are paginated automatically; Markdown remains the default and continues to use `content/posts/index.json`.
 
 ## Troubleshooting
 

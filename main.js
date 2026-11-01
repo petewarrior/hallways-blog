@@ -1,3 +1,4 @@
+import './src/post-scrollbar.js';
 import { loadWordPressConfig, parseContent, parseWordPressContent } from './src/content-parser.js';
 import { HallwayLoader } from './src/hallway-loader.js';
 import { Navigation } from './src/navigation.js';
@@ -36,7 +37,7 @@ class BlogApp {
         this.contentSource = config.contentSource === 'wordpress' ? 'wordpress' : 'markdown';
         let result;
         if (this.contentSource === 'wordpress') {
-            this.wordpressConfig = await loadWordPressConfig();
+            this.wordpressConfig = loadWordPressConfig();
             result = await parseWordPressContent(this.wordpressConfig);
         } else {
             result = await parseContent('content/posts');

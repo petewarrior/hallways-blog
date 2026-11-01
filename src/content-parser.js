@@ -129,36 +129,14 @@ async function parseContent(postsPath) {
     return { posts, categories };
 }
 
-function parseEnvironment(text) {
-    const values = {};
-    for (const sourceLine of String(text || '').split(/\r?\n/)) {
-        const line = sourceLine.trim().replace(/^export\s+/, '');
-        if (!line || line.startsWith('#')) continue;
-
-        const separator = line.indexOf('=');
-        if (separator <= 0) continue;
-        const key = line.slice(0, separator).trim();
-        let value = line.slice(separator + 1).trim();
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-        }
-        values[key] = value;
-    }
-    return values;
-}
-
-async function loadWordPressConfig(envPath = '.env') {
-    const response = await fetch(envPath);
-    if (!response.ok) throw new Error(`Failed to load WordPress settings: ${response.status}`);
-
-    const values = parseEnvironment(await response.text());
-    const apiBaseUrl = values.WORDPRESS_API_BASE_URL?.trim();
-    if (!apiBaseUrl) throw new Error('WORDPRESS_API_BASE_URL is required in .env');
+function loadWordPressConfig(values = import.meta.env) {
+    const apiBaseUrl = values.VITE_WORDPRESS_API_BASE_URL?.trim();
+    if (!apiBaseUrl) throw new Error('VITE_WORDPRESS_API_BASE_URL is required in the Vite environment');
 
     return {
         apiBaseUrl,
-        parentCategoryId: values.WORDPRESS_PARENT_CATEGORY_ID?.trim() || null,
-        imageProxyUrl: values.WORDPRESS_IMAGE_PROXY_URL?.trim() || ''
+        parentCategoryId: values.VITE_WORDPRESS_PARENT_CATEGORY_ID?.trim() || null,
+        imageProxyUrl: values.VITE_WORDPRESS_IMAGE_PROXY_URL?.trim() || ''
     };
 }
 
