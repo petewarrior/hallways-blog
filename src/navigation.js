@@ -12,6 +12,7 @@ class Navigation {
         this.onApproachPost = options.onApproachPost || (() => {});
         this.onCancelApproach = options.onCancelApproach || (() => {});
         this.onReturnToLobby = options.onReturnToLobby || (() => {});
+        this.onReachDestination = options.onReachDestination || (() => {});
         
         this.currentRoom = 'lobby';
         this.roomHistory = ['lobby'];
@@ -21,6 +22,8 @@ class Navigation {
         this.previousDistances = new Map();
         this.prewarmedDoorway = null;
         this.corridorEnd = null;
+        this.readingRoomBounds = null;
+        this.destinationReady = true;
         this.previousCorridorZ = null;
         this.lastFrame = performance.now();
         
@@ -51,7 +54,7 @@ class Navigation {
         this.lastFrame = now;
         this.moveRig(delta);
 
-        if (this.currentRoom === 'lobby') {
+        if (this.isLobby()) {
             this.checkDoorwayCrossing();
         } else {
             this.checkCorridorReturn();
@@ -71,10 +74,11 @@ class Navigation {
         const position = this.rig.object3D.position;
         const previousX = position.x;
         const previousZ = position.z;
+        const previousWorldPosition = this.rig.object3D.getWorldPosition(new THREE.Vector3());
         position.x += (-Math.sin(yaw) * forwardAmount + Math.cos(yaw) * strafeAmount) * speed * delta;
         position.z += (-Math.cos(yaw) * forwardAmount - Math.sin(yaw) * strafeAmount) * speed * delta;
         this.rig.object3D.updateMatrixWorld(true);
-        if (this.currentRoom === 'lobby') {
+        if (this.isLobby()) {
             for (const boundary of this.boundaries) {
                 const offsetX = position.x - boundary.x;
                 const offsetZ = position.z - boundary.z;
@@ -91,9 +95,51 @@ class Navigation {
         } else if (this.hallwayContainer?.object3D) {
             const worldPosition = this.rig.object3D.getWorldPosition(new THREE.Vector3());
             const localPosition = this.hallwayContainer.object3D.worldToLocal(worldPosition);
-            localPosition.x = Math.max(-1.7, Math.min(1.7, localPosition.x));
-            if (this.corridorEnd !== null) {
-                localPosition.z = Math.max(this.corridorEnd - 3.6, localPosition.z);
+            if (this.readingRoomBounds) {
+                const bounds = this.readingRoomBounds;
+                const previousLocalPosition = this.hallwayContainer.object3D.worldToLocal(previousWorldPosition);
+                const radius = 0.28;
+                const doorwayHalfWidth = bounds.doorwayWidth / 2 - radius;
+                const crossedIntoRoom = previousLocalPosition.z > bounds.frontZ && localPosition.z <= bounds.frontZ;
+                const crossedIntoHallway = previousLocalPosition.z <= bounds.frontZ && localPosition.z > bounds.frontZ;
+
+                if (localPosition.z <= bounds.frontZ && !this.destinationReady) {
+                    localPosition.z = bounds.frontZ + radius;
+                } else if (crossedIntoRoom && Math.abs(localPosition.x) > doorwayHalfWidth) {
+                    localPosition.z = bounds.frontZ + radius;
+                } else if (crossedIntoHallway && Math.abs(localPosition.x) > doorwayHalfWidth) {
+                    localPosition.z = bounds.frontZ - radius;
+                }
+
+                if (localPosition.z <= bounds.frontZ) {
+                    localPosition.x = Math.max(-bounds.width / 2 + radius, Math.min(bounds.width / 2 - radius, localPosition.x));
+                    localPosition.z = Math.max(bounds.backZ + radius, localPosition.z);
+                } else {
+                    localPosition.x = Math.max(-1.7, Math.min(1.7, localPosition.x));
+                }
+
+                const collidesWithPanel = (x, z) => bounds.obstacles.some(obstacle =>
+                    Math.abs(x - obstacle.x) < obstacle.halfWidth + radius &&
+                    Math.abs(z - obstacle.z) < obstacle.halfDepth + radius
+                );
+                if (localPosition.z <= bounds.frontZ && collidesWithPanel(localPosition.x, localPosition.z)) {
+                    const canSlideX = !collidesWithPanel(localPosition.x, previousLocalPosition.z);
+                    const canSlideZ = !collidesWithPanel(previousLocalPosition.x, localPosition.z);
+                    if (canSlideX) localPosition.z = previousLocalPosition.z;
+                    else if (canSlideZ) localPosition.x = previousLocalPosition.x;
+                    else {
+                        localPosition.x = previousLocalPosition.x;
+                        localPosition.z = previousLocalPosition.z;
+                    }
+                }
+            } else {
+                localPosition.x = Math.max(-1.7, Math.min(1.7, localPosition.x));
+                if (this.corridorEnd !== null) {
+                    const destinationLimit = this.destinationReady
+                        ? this.corridorEnd - 3.6
+                        : this.corridorEnd + 0.4;
+                    localPosition.z = Math.max(destinationLimit, localPosition.z);
+                }
             }
             const constrainedWorld = this.hallwayContainer.object3D.localToWorld(localPosition);
             position.x = constrainedWorld.x;
@@ -130,10 +176,21 @@ class Navigation {
     }
 
     enterDoorway(doorway) {
-        if (this.currentRoom !== 'lobby') return;
+        if (!this.isLobby()) return;
+        if (doorway.post?.type === 'parent') {
+            this.currentRoom = 'hallway';
+            this.activeDoorway = doorway;
+            this.previousDistances.clear();
+            const worldPosition = this.rig.object3D.getWorldPosition(new THREE.Vector3());
+            this.previousCorridorZ = this.hallwayContainer.object3D.worldToLocal(worldPosition).z;
+            this.onEnterPost(doorway.post, doorway);
+            return;
+        }
         this.currentRoom = 'hallway';
         this.roomHistory = ['lobby', doorway.post.id];
         this.activeDoorway = doorway;
+        this.readingRoomBounds = null;
+        this.destinationReady = false;
         this.prewarmedDoorway = null;
         this.previousDistances.clear();
         this.onEnterPost(doorway.post, doorway);
@@ -145,6 +202,14 @@ class Navigation {
         if (!this.hallwayContainer?.object3D) return;
         const position = this.rig.object3D.getWorldPosition(new THREE.Vector3());
         const localPosition = this.hallwayContainer.object3D.worldToLocal(position);
+        if (this.activeDoorway?.post?.type === 'category' && this.destinationReady && this.corridorEnd !== null && localPosition.z <= this.corridorEnd - 0.6) {
+            this.onReachDestination(this.activeDoorway.post, this.activeDoorway);
+            return;
+        }
+        if (this.activeDoorway?.post?.type === 'parent' && this.corridorEnd !== null && localPosition.z <= this.corridorEnd - 0.6) {
+            this.returnToLobby(false);
+            return;
+        }
         if (this.previousCorridorZ !== null && this.previousCorridorZ <= 0.6 && localPosition.z > 0.6) {
             this.returnToLobby(false);
             return;
@@ -158,14 +223,42 @@ class Navigation {
         this.roomHistory = ['lobby'];
         this.activeDoorway = null;
         this.corridorEnd = null;
+        this.readingRoomBounds = null;
+        this.destinationReady = true;
         this.previousCorridorZ = null;
         this.previousDistances.clear();
         if (direct) this.rig.setAttribute('position', '0 0 0');
-        this.onReturnToLobby();
+        this.onReturnToLobby(direct);
     }
 
     setCorridorEnd(endZ) {
         this.corridorEnd = endZ;
+    }
+
+    setReadingRoom(bounds) {
+        this.readingRoomBounds = bounds;
+    }
+
+    setDestinationReady(ready) {
+        this.destinationReady = ready;
+    }
+
+    setLobby(doorways, boundaries, nested = false) {
+        this.currentRoom = nested ? 'category-lobby' : 'lobby';
+        this.roomHistory = [this.currentRoom];
+        this.activeDoorway = null;
+        this.prewarmedDoorway = null;
+        this.corridorEnd = null;
+        this.readingRoomBounds = null;
+        this.destinationReady = true;
+        this.previousCorridorZ = null;
+        this.doorways = doorways;
+        this.boundaries = boundaries;
+        this.previousDistances.clear();
+    }
+
+    isLobby() {
+        return this.currentRoom === 'lobby' || this.currentRoom === 'category-lobby';
     }
 
     destroy() {

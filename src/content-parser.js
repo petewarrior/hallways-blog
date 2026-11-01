@@ -99,6 +99,8 @@ async function parseContent(postsPath) {
         throw new Error('Post manifest must be an array of Markdown filenames');
     }
 
+    console.log(files.length);
+
     const parsedPosts = await Promise.all(
         files.map(file => parseMarkdownFile(`${postsPath}/${file}`))
     );
@@ -127,4 +129,116 @@ async function parseContent(postsPath) {
     return { posts, categories };
 }
 
-export { parseContent, parseMarkdownFile, convertMarkdownToHtml };
+function parseEnvironment(text) {
+    const values = {};
+    for (const sourceLine of String(text || '').split(/\r?\n/)) {
+        const line = sourceLine.trim().replace(/^export\s+/, '');
+        if (!line || line.startsWith('#')) continue;
+
+        const separator = line.indexOf('=');
+        if (separator <= 0) continue;
+        const key = line.slice(0, separator).trim();
+        let value = line.slice(separator + 1).trim();
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+        }
+        values[key] = value;
+    }
+    return values;
+}
+
+async function loadWordPressConfig(envPath = '.env') {
+    const response = await fetch(envPath);
+    if (!response.ok) throw new Error(`Failed to load WordPress settings: ${response.status}`);
+
+    const values = parseEnvironment(await response.text());
+    const apiBaseUrl = values.WORDPRESS_API_BASE_URL?.trim();
+    if (!apiBaseUrl) throw new Error('WORDPRESS_API_BASE_URL is required in .env');
+
+    return {
+        apiBaseUrl,
+        parentCategoryId: values.WORDPRESS_PARENT_CATEGORY_ID?.trim() || null,
+        imageProxyUrl: values.WORDPRESS_IMAGE_PROXY_URL?.trim() || ''
+    };
+}
+
+async function fetchWordPressPages(apiBaseUrl, path, params = {}) {
+    const items = [];
+    let page = 1;
+    const endpoint = `${apiBaseUrl.replace(/\/+$/, '')}/${path}`;
+
+    while (true) {
+        const query = new URLSearchParams({ ...params, per_page: '100', page: String(page) });
+        const response = await fetch(`${endpoint}?${query}`);
+        if (!response.ok) {
+            throw new Error(`WordPress API request failed (${response.status}): ${path}`);
+        }
+
+        const pageItems = await response.json();
+        if (!Array.isArray(pageItems)) {
+            throw new Error(`WordPress API returned an invalid ${path} response`);
+        }
+        items.push(...pageItems);
+
+        const totalPages = Number(response.headers.get('X-WP-TotalPages'));
+        if (totalPages ? page >= totalPages : pageItems.length < 100) break;
+        page++;
+    }
+
+    return items;
+}
+
+function stripHtml(html) {
+    const element = document.createElement('div');
+    element.innerHTML = html || '';
+    return element.textContent.trim();
+}
+
+async function parseWordPressContent({ apiBaseUrl, parentCategoryId } = {}) {
+    if (!apiBaseUrl) throw new Error('WordPress API base URL is required');
+    const categoryParams = parentCategoryId ? { parent: String(parentCategoryId) } : {};
+    const wordpressCategories = await fetchWordPressPages(apiBaseUrl, 'categories', categoryParams);
+    const categories = new Map();
+    const posts = [];
+
+    for (const wordpressCategory of wordpressCategories) {
+        const category = {
+            id: String(wordpressCategory.id),
+            type: 'category',
+            name: stripHtml(wordpressCategory.name) || 'Uncategorized',
+            slug: wordpressCategory.slug,
+            posts: [],
+            postCount: 0
+        };
+        const wordpressPosts = await fetchWordPressPages(apiBaseUrl, 'posts', {
+            categories: String(wordpressCategory.id),
+            _embed: 'wp:featuredmedia'
+        });
+
+        for (const wordpressPost of wordpressPosts) {
+            const post = {
+                id: String(wordpressPost.id),
+                path: wordpressPost.link,
+                title: stripHtml(wordpressPost.title?.rendered) || 'Untitled',
+                date: wordpressPost.date || '',
+                category: category.name,
+                categoryId: category.id,
+                categorySlug: category.slug,
+                excerpt: stripHtml(wordpressPost.excerpt?.rendered),
+                image: wordpressPost._embedded?.['wp:featuredmedia']?.[0]?.source_url || '',
+                html: wordpressPost.content?.rendered || '',
+                body: wordpressPost.content?.rendered || ''
+            };
+            category.posts.push(post);
+            posts.push(post);
+        }
+
+        category.postCount = category.posts.length;
+        categories.set(category.id, category);
+    }
+
+    posts.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return { posts, categories };
+}
+
+export { parseContent, parseWordPressContent, loadWordPressConfig, parseMarkdownFile, convertMarkdownToHtml };
