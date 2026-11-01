@@ -2,23 +2,24 @@
 
 ## Overview
 
-Hallways is a browser-based 3D blog built with A-Frame 1.8 and native JavaScript ES modules. It supports Markdown posts from `content/posts/` and WordPress.com REST API content. The app has no package manifest, bundler, or automated test suite.
+Hallways is a browser-based 3D blog built with A-Frame 1.8, Vite, and native JavaScript ES modules. It supports Markdown posts from `content/posts/` and WordPress.com REST API content. There is no automated test suite.
 
 ## Run Locally
 
-Serve the repository root over HTTP; do not open `index.html` directly:
+Install dependencies and run the Vite development server; do not open `index.html` directly:
 
 ```bash
-python3 -m http.server 8000
+pnpm install
+pnpm dev
 ```
 
-Set `content/config.json` to `"contentSource": "wordpress"` to enable WordPress. In a second terminal, start the image proxy:
+Set `content/config.json` to `"contentSource": "wordpress"` to enable WordPress. Vite reads the public `VITE_WORDPRESS_*` values from `.env`. In a second terminal, start the local image proxy:
 
 ```bash
 node server-proxy.js
 ```
 
-The proxy listens on port 3000 by default. Keep `WORDPRESS_IMAGE_PROXY_URL` in `.env` aligned with its port. The browser fetches `.env`, so all values in it are public configuration; never put credentials or secrets there. `WORDPRESS_IMAGE_ALLOWED_HOSTS` restricts HTTPS image proxy targets.
+The proxy listens on port 3000 by default. Vite proxies `/api/image` to it during development. The browser-facing `VITE_WORDPRESS_*` values are injected into the bundle and are public configuration; never put credentials or secrets in them. `WORDPRESS_IMAGE_ALLOWED_HOSTS` is server-side configuration and restricts HTTPS image proxy targets. For Pages, configure that value in the Pages environment; `functions/api/image.js` provides the `/api/image` endpoint.
 
 ## Content
 
@@ -40,6 +41,8 @@ The proxy listens on port 3000 by default. Keep `WORDPRESS_IMAGE_PROXY_URL` in `
 | `src/post-scrollbar.js` | A-Frame scrollbar component |
 | `server-proxy.js` | WordPress passthrough and allowlisted CORS image proxy |
 | `index.html` | A-Frame scene, rig, containers, assets, and module entry point |
+| `vite.config.js` | Minified production build, copied static directories, and dev proxy |
+| `functions/api/image.js` | Cloudflare Pages allowlisted CORS image proxy |
 
 ## Navigation Invariants
 
@@ -51,11 +54,12 @@ The proxy listens on port 3000 by default. Keep `WORDPRESS_IMAGE_PROXY_URL` in `
 
 ## Editing and Verification
 
-Use the existing browser-side ES module and A-Frame patterns; avoid adding dependencies or build tooling unless the project scope changes. Keep category/post routing and destination readiness coordinated between `main.js`, `navigation.js`, `hallway-loader.js`, and `room-generator.js`.
+Use the existing browser-side ES module and A-Frame patterns. Keep Vite as the build tool and manage dependencies with pnpm. Keep category/post routing and destination readiness coordinated between `main.js`, `navigation.js`, `hallway-loader.js`, and `room-generator.js`.
 
 There are no configured test scripts. After JavaScript changes, check editor diagnostics and run:
 
 ```bash
+pnpm build
 node --check server-proxy.js
 git diff --check
 ```

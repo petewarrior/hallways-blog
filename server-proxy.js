@@ -22,7 +22,7 @@ try {
 }
 
 const PORT = process.env.PROXY_PORT || 3000;
-const WP_URL = process.env.WP_URL || process.env.WORDPRESS_API_BASE_URL || 'https://your-wordpress-site.com';
+const WP_URL = process.env.WP_URL || process.env.VITE_WORDPRESS_API_BASE_URL || 'https://your-wordpress-site.com';
 const ALLOWED_IMAGE_HOSTS = (process.env.WORDPRESS_IMAGE_ALLOWED_HOSTS || '')
     .split(',')
     .map(host => host.trim().toLowerCase())
