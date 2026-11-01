@@ -52,6 +52,7 @@ class Navigation {
         const now = performance.now();
         const delta = Math.min((now - this.lastFrame) / 1000, 0.05);
         this.lastFrame = now;
+        this.syncJoystickMovement();
         this.moveRig(delta);
 
         if (this.isLobby()) {
@@ -59,6 +60,17 @@ class Navigation {
         } else {
             this.checkCorridorReturn();
         }
+    }
+
+    syncJoystickMovement() {
+        const cameraPosition = this.camera.object3D.position;
+        if (!cameraPosition.x && !cameraPosition.z) return;
+
+        const offset = new THREE.Vector3(cameraPosition.x, 0, cameraPosition.z)
+            .applyQuaternion(this.rig.object3D.quaternion);
+        this.rig.object3D.position.add(offset);
+        this.camera.setAttribute('position', `0 ${cameraPosition.y} 0`);
+        this.rig.object3D.updateMatrixWorld(true);
     }
 
     moveRig(delta) {
