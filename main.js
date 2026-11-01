@@ -1,4 +1,4 @@
-import { parseContent } from './src/content-parser.js';
+import { loadWordPressConfig, parseContent, parseWordPressContent } from './src/content-parser.js';
 import { HallwayLoader } from './src/hallway-loader.js';
 import { Navigation } from './src/navigation.js';
 import { PostCanvas } from './src/post-canvas.js';
@@ -7,11 +7,21 @@ import { RoomGenerator } from './src/room-generator.js';
 class BlogApp {
     constructor() {
         this.posts = [];
+        this.categories = [];
+        this.currentCategory = null;
+        this.pendingCategory = null;
+        this.mainLobbyData = null;
+        this.categoryLobbyData = null;
+        this.categoryLobbyPosition = null;
+        this.categoryEntryDoorway = null;
+        this.contentSource = 'markdown';
+        this.wordpressConfig = null;
         this.currentPost = null;
         this.scene = document.getElementById('scene');
         this.rig = document.getElementById('rig');
         this.camera = document.getElementById('camera');
         this.lobbyContainer = document.getElementById('lobby-container');
+        this.categoryLobbyContainer = document.getElementById('category-lobby-container');
         this.hallwayContainer = document.getElementById('hallway-container');
         this.roomContainer = document.getElementById('room-container');
         this.backButton = document.getElementById('back-button');
@@ -20,20 +30,36 @@ class BlogApp {
 
     async init() {
         await this.waitForScene();
-        const result = await parseContent('content/posts');
+        const configResponse = await fetch('content/config.json');
+        if (!configResponse.ok) throw new Error(`Failed to load content config: ${configResponse.status}`);
+        const config = await configResponse.json();
+        this.contentSource = config.contentSource === 'wordpress' ? 'wordpress' : 'markdown';
+        let result;
+        if (this.contentSource === 'wordpress') {
+            this.wordpressConfig = await loadWordPressConfig();
+            result = await parseWordPressContent(this.wordpressConfig);
+        } else {
+            result = await parseContent('content/posts');
+        }
         this.posts = result.posts;
+        this.categories = Array.from(result.categories.values());
 
         this.roomGenerator = new RoomGenerator({
             lobbyContainer: this.lobbyContainer,
+            categoryLobbyContainer: this.categoryLobbyContainer,
             roomContainer: this.roomContainer
         });
-        const doorways = this.roomGenerator.createLobby(this.posts);
+        const doorways = this.roomGenerator.createLobby(
+            this.contentSource === 'wordpress' ? this.categories : this.posts
+        );
+        this.mainLobbyData = { doorways, boundaries: this.roomGenerator.boundaries };
         this.hallwayLoader = new HallwayLoader({
             rig: this.rig,
             container: this.hallwayContainer
         });
         this.postCanvas = new PostCanvas({
             canvas: document.getElementById('post-canvas'),
+            imageProxyUrl: this.wordpressConfig?.imageProxyUrl,
             onRender: () => this.roomGenerator.refreshCanvasTexture()
         });
         this.navigation = new Navigation({
@@ -44,8 +70,27 @@ class BlogApp {
             boundaries: this.roomGenerator.boundaries,
             onApproachPost: (_post, doorway) => this.hallwayLoader.preview(doorway),
             onCancelApproach: doorway => this.hallwayLoader.cancelPreview(doorway),
-            onEnterPost: (post, doorway) => this.beginPost(post, doorway),
-            onReturnToLobby: () => this.returnToLobby()
+            onEnterPost: (destination, doorway) => {
+                if (destination.type === 'category') {
+                    this.enterCategory(destination, doorway).catch(error => {
+                        console.error('Failed to prepare category lobby:', error);
+                        this.navigation.setDestinationReady(true);
+                        this.navigation.returnToLobby(true);
+                    });
+                }
+                else if (destination.type === 'parent') {
+                    const destinationDoorway = this.mainLobbyData.doorways.find(
+                        item => item.post.id === this.categoryEntryDoorway.post.id
+                    );
+                    const destinationPosition = this.hallwayContainer.object3D.worldToLocal(
+                        new THREE.Vector3(destinationDoorway.x, 0, destinationDoorway.z)
+                    );
+                    this.navigation.setCorridorEnd(this.hallwayLoader.completeLoading(destinationPosition.z));
+                }
+                else this.beginPost(destination, doorway);
+            },
+            onReachDestination: category => this.activateCategory(category),
+            onReturnToLobby: direct => this.returnToLobby(direct)
         });
         this.backButton.addEventListener('click', () => this.navigation.returnToLobby(true));
         this.roomLabel.textContent = this.getLobbyLabel();
@@ -80,16 +125,95 @@ class BlogApp {
     }
 
     getLobbyLabel() {
+        if (this.currentCategory) {
+            const noun = this.currentCategory.posts.length === 1 ? 'post' : 'posts';
+            return `${this.currentCategory.name} - ${this.currentCategory.posts.length} ${noun}`;
+        }
+        if (this.contentSource === 'wordpress') {
+            const noun = this.categories.length === 1 ? 'category' : 'categories';
+            return `Lobby - ${this.categories.length} ${noun}`;
+        }
         const noun = this.posts.length === 1 ? 'post' : 'posts';
         return `Lobby - ${this.posts.length} ${noun}`;
     }
 
+    async enterCategory(category, doorway) {
+        this.pendingCategory = category;
+        this.categoryEntryDoorway = doorway;
+        this.lobbyContainer.setAttribute('visible', 'false');
+        this.categoryLobbyContainer.setAttribute('visible', 'false');
+        this.hallwayLoader.start(doorway);
+        const corridorEnd = this.hallwayLoader.prepareEnd();
+        this.navigation.setCorridorEnd(corridorEnd);
+
+        const worldRotation = this.hallwayContainer.object3D.getWorldQuaternion(new THREE.Quaternion());
+        const yaw = new THREE.Euler().setFromQuaternion(worldRotation, 'YXZ').y;
+        this.categoryLobbyContainer.setAttribute('rotation', `0 ${yaw * 180 / Math.PI} 0`);
+
+        const localDoorways = this.roomGenerator.createLobby(category.posts, this.categoryLobbyContainer, {
+            entrance: true,
+            entranceDestination: { id: 'parent', type: 'parent', title: 'Categories' }
+        });
+        const positionCategoryLobby = endZ => {
+            const lobbyCenter = this.hallwayContainer.object3D.localToWorld(
+                new THREE.Vector3(0, 0, endZ - this.roomGenerator.lobbyApothem)
+            );
+            this.categoryLobbyPosition = { x: lobbyCenter.x, y: 0, z: lobbyCenter.z };
+            this.categoryLobbyContainer.setAttribute('position', this.categoryLobbyPosition);
+        };
+        positionCategoryLobby(corridorEnd);
+        this.categoryLobbyData = this.roomGenerator.getWorldLobby(
+            this.categoryLobbyContainer,
+            localDoorways,
+            this.roomGenerator.boundaries
+        );
+        this.categoryLobbyContainer.setAttribute('visible', 'false');
+        this.roomLabel.textContent = `Heading to ${category.name}`;
+        this.backButton.textContent = '← Lobby';
+        this.backButton.setAttribute('aria-label', 'Return to lobby');
+        this.backButton.classList.remove('hidden');
+
+        await this.roomGenerator.waitForEntities(this.categoryLobbyContainer);
+        const finalEnd = this.hallwayLoader.completeLoading();
+        this.navigation.setCorridorEnd(finalEnd);
+        if (Math.abs(finalEnd - corridorEnd) > 0.001) {
+            positionCategoryLobby(finalEnd);
+            this.categoryLobbyData = this.roomGenerator.getWorldLobby(
+                this.categoryLobbyContainer,
+                localDoorways,
+                this.roomGenerator.boundaries
+            );
+        }
+        this.navigation.setDestinationReady(true);
+    }
+
+    activateCategory(category) {
+        if (this.pendingCategory !== category) return;
+        this.currentCategory = category;
+        this.pendingCategory = null;
+        this.hallwayLoader.stop();
+        this.categoryLobbyContainer.setAttribute('visible', 'true');
+        this.navigation.setLobby(
+            this.categoryLobbyData.doorways,
+            this.categoryLobbyData.boundaries,
+            true
+        );
+        this.roomLabel.textContent = this.getLobbyLabel();
+        this.backButton.textContent = '← Categories';
+        this.backButton.setAttribute('aria-label', 'Return to categories');
+        this.backButton.classList.remove('hidden');
+    }
     async beginPost(post, doorway) {
         this.currentPost = post;
         this.roomLabel.textContent = post.title;
         this.backButton.classList.remove('hidden');
+        this.backButton.textContent = this.currentCategory ? '← Category' : '← Lobby';
+        this.backButton.setAttribute('aria-label', this.currentCategory ? 'Return to category' : 'Return to lobby');
         this.roomGenerator.setLobbyVisible(false);
+        this.categoryLobbyContainer.setAttribute('visible', 'false');
         this.hallwayLoader.start(doorway);
+        const corridorEnd = this.hallwayLoader.prepareEnd();
+        this.navigation.setCorridorEnd(corridorEnd);
 
         try {
             await this.postCanvas.prepare(post);
@@ -100,18 +224,47 @@ class BlogApp {
         }
 
         if (this.currentPost !== post) return;
-        const corridorEnd = this.hallwayLoader.completeLoading();
+        const roomBounds = this.roomGenerator.createReadingRoom(post, corridorEnd, this.postCanvas.getImagePanels());
+        this.navigation.setReadingRoom(roomBounds);
+        await this.roomGenerator.waitForEntities(this.roomContainer);
+    this.hallwayLoader.completeLoading(corridorEnd);
         this.navigation.setCorridorEnd(corridorEnd);
-        this.roomGenerator.createReadingRoom(post, corridorEnd);
+        this.navigation.setDestinationReady(true);
     }
 
-    returnToLobby() {
+    returnToLobby(direct = false) {
+        const returnToCategory = Boolean(this.currentPost && this.currentCategory);
         this.currentPost = null;
-        this.hallwayLoader.stop();
+        this.pendingCategory = null;
         this.roomGenerator.clearReadingRoom();
-        this.roomGenerator.setLobbyVisible(true);
         this.postCanvas.clear();
-        this.backButton.classList.add('hidden');
+
+        if (returnToCategory) {
+            this.hallwayLoader.stop();
+            this.lobbyContainer.setAttribute('visible', 'false');
+            this.hallwayContainer.setAttribute('visible', 'false');
+            this.categoryLobbyContainer.setAttribute('visible', 'true');
+            if (direct) this.rig.setAttribute('position', this.categoryLobbyPosition);
+            if (this.categoryEntryDoorway) {
+                this.hallwayLoader.start(this.categoryEntryDoorway);
+                this.hallwayLoader.completeLoading();
+            }
+            this.navigation.setLobby(
+                this.categoryLobbyData.doorways,
+                this.categoryLobbyData.boundaries,
+                true
+            );
+            this.backButton.textContent = '← Categories';
+            this.backButton.setAttribute('aria-label', 'Return to categories');
+        } else {
+            this.hallwayLoader.stop();
+            this.currentCategory = null;
+            this.categoryLobbyContainer.setAttribute('visible', 'false');
+            this.roomGenerator.setLobbyVisible(true);
+            this.navigation.setLobby(this.mainLobbyData.doorways, this.mainLobbyData.boundaries);
+            if (direct) this.rig.setAttribute('position', '0 0 0');
+            this.backButton.classList.add('hidden');
+        }
         this.roomLabel.textContent = this.getLobbyLabel();
     }
 }

@@ -1,4 +1,5 @@
 {
+    "contentSource": "wordpress",
     "title": "My 3D Blog",
     "description": "A blog you can walk through",
     "recentPostsCount": 5,

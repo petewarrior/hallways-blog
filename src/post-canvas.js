@@ -60,6 +60,33 @@ function parseMarkdownBlocks(markdown) {
     return blocks;
 }
 
+function parseHtmlBlocks(html) {
+    const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    const blocks = [];
+
+    for (const element of parsed.body.querySelectorAll('h1, h2, h3, p, li, pre, blockquote, img')) {
+        if (element.tagName === 'IMG') {
+            blocks.push({ type: 'image', alt: element.getAttribute('alt') || '', url: element.getAttribute('src') || '' });
+            continue;
+        }
+        if (element.closest('pre') && element.tagName !== 'PRE') continue;
+
+        const text = element.textContent.trim();
+        if (!text) continue;
+        if (/^H[1-3]$/.test(element.tagName)) {
+            blocks.push({ type: 'heading', level: Number(element.tagName[1]), text });
+        } else if (element.tagName === 'PRE') {
+            blocks.push({ type: 'code', text });
+        } else if (element.tagName === 'LI') {
+            blocks.push({ type: 'list', text: `-  ${text}` });
+        } else {
+            blocks.push({ type: 'paragraph', text });
+        }
+    }
+
+    return blocks;
+}
+
 function plainText(markdown) {
     return String(markdown || '')
         .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
@@ -120,12 +147,14 @@ class PostCanvas {
     constructor(options) {
         this.canvas = options.canvas;
         this.context = this.canvas.getContext('2d');
+        this.imageProxyUrl = options.imageProxyUrl || '';
         this.onRender = options.onRender || (() => {});
         this.active = false;
         this.scrollY = 0;
         this.maxScroll = 0;
         this.items = [];
         this.images = new Map();
+        this.imagePanels = [];
         this.post = null;
         this.wheelHandler = event => {
             if (!this.active) return;
@@ -145,10 +174,17 @@ class PostCanvas {
         this.post = post;
         this.active = true;
         this.scrollY = 0;
-        const blocks = parseMarkdownBlocks(post.markdown || post.body || '');
+        const blocks = post.html
+            ? parseHtmlBlocks(post.html)
+            : parseMarkdownBlocks(post.markdown || post.body || '');
         const imageBlocks = blocks.filter(block => block.type === 'image');
         const postUrl = new URL(post.path || 'content/posts/', document.baseURI);
-        const resolveImageUrl = url => new URL(url, postUrl).href;
+        const resolveImageUrl = url => {
+            const resolvedUrl = new URL(url, postUrl).href;
+            return this.imageProxyUrl
+                ? `${this.imageProxyUrl}${encodeURIComponent(resolvedUrl)}`
+                : resolvedUrl;
+        };
         imageBlocks.forEach(block => {
             block.url = resolveImageUrl(block.url);
         });
@@ -158,6 +194,20 @@ class PostCanvas {
 
         const entries = await Promise.all(Array.from(urls, async url => [url, await loadImage(url)]));
         this.images = new Map(entries);
+        const panels = new Map();
+        if (this.featuredImageUrl) panels.set(this.featuredImageUrl, { url: this.featuredImageUrl, alt: post.title || 'Featured image' });
+        imageBlocks.forEach(block => {
+            if (!panels.has(block.url)) panels.set(block.url, { url: block.url, alt: block.alt });
+        });
+        this.imagePanels = Array.from(panels.values(), panel => {
+            const image = this.images.get(panel.url);
+            const available = Boolean(image?.naturalWidth && image?.naturalHeight);
+            return {
+                ...panel,
+                available,
+                aspect: available ? image.naturalWidth / image.naturalHeight : null
+            };
+        });
         this.layout(post, blocks);
         await document.fonts?.ready;
         await new Promise(resolve => requestAnimationFrame(resolve));
@@ -188,18 +238,7 @@ class PostCanvas {
             y += lines.length * 32 + 28;
         }
 
-        const featuredImage = this.featuredImageUrl ? { type: 'image', url: this.featuredImageUrl, alt: post.title } : null;
-        const contentBlocks = featuredImage ? [featuredImage, ...blocks.filter(block => block.url !== this.featuredImageUrl)] : blocks;
-        for (const block of contentBlocks) {
-            if (block.type === 'image') {
-                const image = this.images.get(block.url);
-                const aspect = image?.naturalWidth && image?.naturalHeight ? image.naturalWidth / image.naturalHeight : 2.1;
-                const height = image ? Math.min(390, CONTENT_WIDTH / aspect) : 112;
-                this.items.push({ ...block, x: CONTENT_LEFT, y, width: CONTENT_WIDTH, height });
-                y += height + 28;
-                continue;
-            }
-
+        for (const block of blocks.filter(block => block.type !== 'image')) {
             const isHeading = block.type === 'heading';
             const isCode = block.type === 'code';
             const font = isHeading
@@ -283,12 +322,17 @@ class PostCanvas {
         this.draw();
     }
 
+    getImagePanels() {
+        return this.imagePanels;
+    }
+
     clear() {
         this.active = false;
         this.scrollY = 0;
         this.maxScroll = 0;
         this.post = null;
         this.featuredImageUrl = '';
+        this.imagePanels = [];
         this.items = [];
         this.images.clear();
         this.context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
