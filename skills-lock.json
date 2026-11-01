@@ -6,6 +6,12 @@
       "sourceType": "github",
       "skillPath": ".claude/skills/aframe-webxr/SKILL.md",
       "computedHash": "805628258210c6504bcab36dd3407c99d1d0e1d44d17f8a8bdbbb706460c2306"
+    },
+    "cloudflare": {
+      "source": "cloudflare/skills",
+      "sourceType": "github",
+      "skillPath": "skills/cloudflare/SKILL.md",
+      "computedHash": "e7c26bb690042060d60fcccf3e5807d000c9c064f732b6fcfccb8bbcdc5dc04a"
     }
   }
 }
