@@ -1,0 +1,165 @@
+# 3D Blog
+
+A blog you can walk through, built with A-Frame.
+
+## Features
+
+- **Dynamic lobbies**: Polygon lobbies provide direct post doors for Markdown or category doors for WordPress
+- **Walk-through navigation**: WASD or arrow keys move through doors; mouse movement looks around
+- **Streaming hallways**: GLTF hallway segments extend ahead while post content and images load
+- **Reading rooms**: Each post ends in a cubical room with a scrollable, canvas-textured article plane
+- **Image loading**: WordPress images use an allowlisted CORS proxy so they render on both article and floating image planes
+
+## Quick Start
+
+### Develop locally
+
+Install dependencies and start Vite:
+
+```bash
+pnpm install
+pnpm dev
+```
+
+When `contentSource` is `"wordpress"`, run the local image proxy in a second terminal:
+
+```bash
+node server-proxy.js
+```
+
+Vite serves the app at `http://localhost:5173` and proxies `/api/image` to the local image proxy.
+
+### Deploy to Cloudflare Workers
+
+```bash
+pnpm run deploy
+```
+
+The Vite build is uploaded from `dist/` and served as static assets from Cloudflare's CDN. `worker.js` runs only for `/api/*`; `/api/image` fetches allowlisted images and caches successful responses at Cloudflare's edge for one day. The allowed image hosts are configured in `wrangler.jsonc`. The `VITE_WORDPRESS_*` values must be present in `.env` or the build environment before deployment.
+
+To run the built Worker locally:
+
+```bash
+pnpm run preview
+```
+
+### Open in browser
+
+Navigate to the Vite URL printed by `pnpm dev` or `pnpm preview`.
+
+## Controls
+
+| Action | Desktop | VR |
+|--------|---------|-----|
+| Action | Desktop |
+|--------|---------|
+| Move | WASD or arrow keys; hold Shift to move faster |
+| Look | Mouse movement |
+| Read | Mouse wheel or Page Up/Page Down in a post room |
+| Return | Walk back through the hallway, click Back, or press Esc |
+
+## Project Structure
+
+```
+/hallways
+├── index.html              - Entry point, A-Frame scene
+├── main.js                 - App initialization
+├── styles.css              - UI styling
+├── package.json            - pnpm scripts and Vite dependency
+├── vite.config.js          - Build, static asset copying, and local API proxy
+├── .env                    - Public WordPress API settings
+├── server-proxy.js         - WordPress API and CORS image proxy
+├── worker.js               - Worker entry point for API requests and static assets
+├── wrangler.jsonc          - Workers Static Assets and response-cache configuration
+├── functions/api/image.js  - Shared allowlisted CORS image handler
+│
+├── content/
+│   ├── config.json         - App settings, including the content source
+│   └── posts/
+│       ├── index.json      - Static list of Markdown posts
+│       └── *.md            - Markdown blog posts
+│
+├── src/
+│   ├── content-parser.js   - Parse markdown to posts
+│   ├── room-generator.js   - Create 3D rooms
+│   ├── hallway-loader.js   - Loading hallway extension
+│   ├── navigation.js       - Rig movement and doorway transitions
+│   └── post-canvas.js      - Draw and scroll article content
+│
+└── assets/
+    └── models/             - GLTF models
+        └── hallway_4x4x10/
+```
+
+## Adding Content
+
+### Creating a Post
+
+Create a `.md` file in `content/posts/`:
+
+```markdown
+---
+title: "Your Post Title"
+date: "2024-01-15"
+category: "your-category"
+excerpt: "A brief description shown in the room..."
+image: "https://example.com/image.jpg"
+---
+
+Your post content here. Supports **markdown** formatting.
+
+## Headings
+
+- Lists
+- And more
+
+```code blocks``` too!
+```
+
+Add each Markdown filename to `content/posts/index.json` so the static app can discover it. Browsers cannot enumerate a static directory, so a new post must be listed in the manifest.
+
+## Room Types
+
+| Area | Behavior |
+|------|----------|
+| **Lobby** | Markdown has one doorway per post; WordPress has category doors that lead to category lobbies |
+| **Hallway** | Repeated 4x4x10 GLTF segments extend as the reader walks forward |
+| **Reading room** | A 16x8x12 room with a scrollable text plane, floating image panels, and wall/panel collision |
+
+With no posts, the lobby displays an empty state. Images are loaded with CORS enabled; if a remote host disallows canvas use or an image fails, its placeholder is shown instead.
+
+## Content Source
+
+Choose the content source in `content/config.json`:
+
+```json
+{
+    "contentSource": "markdown"
+}
+```
+
+Set `contentSource` to `"wordpress"` to fetch public content from the WordPress.com REST API. Configure the API endpoint and optional parent category in `.env`:
+
+```env
+VITE_WORDPRESS_API_BASE_URL=https://public-api.wordpress.com/wp/v2/sites/your-site.wordpress.com
+VITE_WORDPRESS_PARENT_CATEGORY_ID=787237432
+VITE_WORDPRESS_IMAGE_PROXY_URL=/api/image?v=2&url=
+WORDPRESS_IMAGE_ALLOWED_HOSTS=*.wordpress.com,*.files.wordpress.com,images.wordpress.com,i0.wp.com,images.unsplash.com,newsdig.ismcdn.jp,i.ibb.co.com
+```
+
+Vite injects only variables prefixed with `VITE_` into the browser bundle. These values are public; never put credentials or secrets in them. `WORDPRESS_IMAGE_ALLOWED_HOSTS` is server-side configuration in `wrangler.jsonc` for deployment and `.env` for `server-proxy.js` locally. Leave `VITE_WORDPRESS_PARENT_CATEGORY_ID` blank or omit it to load categories without a parent filter. The image proxy adds the CORS headers needed for remote image textures, only fetches HTTPS URLs from the allowlist, and caches successful images. The main lobby leads to category lobbies, and each category lobby leads to its post reading rooms. WordPress requests are paginated automatically; Markdown remains the default and continues to use `content/posts/index.json`.
+
+## Troubleshooting
+
+### "Module not found" errors
+Make sure you're running a local server, not opening the file directly.
+
+### Hallway not appearing
+Check browser console for GLTF loading errors. The model path should be correct.
+
+### Click not working
+Click the scene first to enable pointer lock, then try clicking.
+
+## License
+
+MIT
