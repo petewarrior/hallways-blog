@@ -1,23 +1,29 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "aframe-webxr": {
       "source": "freshtechbro/claudedesignskills",
       "sourceType": "github",
       "skillPath": ".claude/skills/aframe-webxr/SKILL.md",
-      "computedHash": "805628258210c6504bcab36dd3407c99d1d0e1d44d17f8a8bdbbb706460c2306"
+      "computedHash": "745296c5a74e224260fceebf81755d6f3284cc0297299e33c403f4e53d49500e"
     },
     "cloudflare": {
       "source": "cloudflare/skills",
       "sourceType": "github",
       "skillPath": "skills/cloudflare/SKILL.md",
-      "computedHash": "e7c26bb690042060d60fcccf3e5807d000c9c064f732b6fcfccb8bbcdc5dc04a"
+      "computedHash": "4bc710f0b53747dcf25621f499d4095f53e6f809e8a094fb72ec879805702ed1"
     },
     "vite": {
       "source": "antfu/skills",
       "sourceType": "github",
       "skillPath": "skills/vite/SKILL.md",
-      "computedHash": "88ee465fd10f711efecc76e91e96accae2b229dda371614dcf219099c264a486"
+      "computedHash": "0817ddc0c50988b36d34c258f62e74b89d8117a02b61978a0ddc5782155b01e0"
+    },
+    "wp-rest-api": {
+      "source": "Automattic/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/wp-rest-api/SKILL.md",
+      "computedHash": "639615b6b2f691ee42c4f747777affff2b6c4318e65e8d91ae385384aa274a63"
     }
   }
 }
