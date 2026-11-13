@@ -52,8 +52,8 @@ class Navigation {
         const now = performance.now();
         const delta = Math.min((now - this.lastFrame) / 1000, 0.05);
         this.lastFrame = now;
-        this.syncJoystickMovement();
-        this.moveRig(delta);
+        const joystickMovement = this.syncJoystickMovement();
+        this.moveRig(delta, joystickMovement);
 
         if (this.isLobby()) {
             this.checkDoorwayCrossing();
@@ -64,31 +64,33 @@ class Navigation {
 
     syncJoystickMovement() {
         const cameraPosition = this.camera.object3D.position;
-        if (!cameraPosition.x && !cameraPosition.z) return;
+        if (!cameraPosition.x && !cameraPosition.z) return new THREE.Vector3();
 
         const offset = new THREE.Vector3(cameraPosition.x, 0, cameraPosition.z)
             .applyQuaternion(this.rig.object3D.quaternion);
-        this.rig.object3D.position.add(offset);
         this.camera.setAttribute('position', `0 ${cameraPosition.y} 0`);
-        this.rig.object3D.updateMatrixWorld(true);
+        return offset;
     }
 
-    moveRig(delta) {
+    moveRig(delta, joystickMovement = new THREE.Vector3()) {
         const forward = Number(this.keys.has('w') || this.keys.has('arrowup')) - Number(this.keys.has('s') || this.keys.has('arrowdown'));
         const strafe = Number(this.keys.has('d') || this.keys.has('arrowright')) - Number(this.keys.has('a') || this.keys.has('arrowleft'));
-        if (!forward && !strafe) return;
+        if (!forward && !strafe && !joystickMovement.x && !joystickMovement.z) return;
 
-        const yaw = this.camera.object3D.rotation.y;
-        const length = Math.hypot(forward, strafe);
-        const forwardAmount = forward / length;
-        const strafeAmount = strafe / length;
-        const speed = this.keys.has('shift') ? 7 : 4;
         const position = this.rig.object3D.position;
         const previousX = position.x;
         const previousZ = position.z;
         const previousWorldPosition = this.rig.object3D.getWorldPosition(new THREE.Vector3());
-        position.x += (-Math.sin(yaw) * forwardAmount + Math.cos(yaw) * strafeAmount) * speed * delta;
-        position.z += (-Math.cos(yaw) * forwardAmount - Math.sin(yaw) * strafeAmount) * speed * delta;
+        if (forward || strafe) {
+            const yaw = this.camera.object3D.rotation.y;
+            const length = Math.hypot(forward, strafe);
+            const forwardAmount = forward / length;
+            const strafeAmount = strafe / length;
+            const speed = this.keys.has('shift') ? 7 : 4;
+            position.x += (-Math.sin(yaw) * forwardAmount + Math.cos(yaw) * strafeAmount) * speed * delta;
+            position.z += (-Math.cos(yaw) * forwardAmount - Math.sin(yaw) * strafeAmount) * speed * delta;
+        }
+        position.add(joystickMovement);
         this.rig.object3D.updateMatrixWorld(true);
         if (this.isLobby()) {
             for (const boundary of this.boundaries) {
