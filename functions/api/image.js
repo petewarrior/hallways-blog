@@ -1,13 +1,12 @@
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff'
 };
 
 function imageError(status, message) {
     return new Response(message, {
         status,
-        headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+        headers: { ...corsHeaders, 'Cache-Control': 'no-store', 'Content-Type': 'text/plain' }
     });
 }
 
@@ -47,7 +46,11 @@ async function fetchImage(url, allowedHosts, redirects = 0) {
 
     return new Response(upstream.body, {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': contentType }
+        headers: {
+            ...corsHeaders,
+            'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+            'Content-Type': contentType
+        }
     });
 }
 

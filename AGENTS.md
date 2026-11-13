@@ -19,7 +19,7 @@ Set `content/config.json` to `"contentSource": "wordpress"` to enable WordPress.
 node server-proxy.js
 ```
 
-The proxy listens on port 3000 by default. Vite proxies `/api/image` to it during development. The browser-facing `VITE_WORDPRESS_*` values are injected into the bundle and are public configuration; never put credentials or secrets in them. `WORDPRESS_IMAGE_ALLOWED_HOSTS` is server-side configuration and restricts HTTPS image proxy targets. For Pages, configure that value in the Pages environment; `functions/api/image.js` provides the `/api/image` endpoint.
+The proxy listens on port 3000 by default. Vite proxies `/api/image` to it during development. The browser-facing `VITE_WORDPRESS_*` values are injected into the bundle and are public configuration; never put credentials or secrets in them. `WORDPRESS_IMAGE_ALLOWED_HOSTS` is server-side configuration and restricts HTTPS image proxy targets. For deployment, `wrangler.jsonc` configures Workers Static Assets and the `worker.js` entry point; `/api/image` uses the handler in `functions/api/image.js`.
 
 ## Content
 
@@ -40,9 +40,10 @@ The proxy listens on port 3000 by default. Vite proxies `/api/image` to it durin
 | `src/post-canvas.js` | Article canvas layout, image loading, and scrolling |
 | `src/post-scrollbar.js` | A-Frame scrollbar component |
 | `server-proxy.js` | WordPress passthrough and allowlisted CORS image proxy |
+| `worker.js` | Cloudflare Worker routes image requests and falls through to CDN static assets |
 | `index.html` | A-Frame scene, rig, containers, assets, and module entry point |
 | `vite.config.js` | Minified production build, copied static directories, and dev proxy |
-| `functions/api/image.js` | Cloudflare Pages allowlisted CORS image proxy |
+| `functions/api/image.js` | Allowlisted CORS image handler shared by the Worker |
 
 ## Navigation Invariants
 
@@ -60,7 +61,9 @@ There are no configured test scripts. After JavaScript changes, check editor dia
 
 ```bash
 pnpm build
+node --check worker.js
 node --check server-proxy.js
+pnpm exec wrangler deploy --dry-run
 git diff --check
 ```
 

@@ -1,7 +1,7 @@
-const http = require('http');
-const https = require('https');
-const fs = require('fs');
-const { URL } = require('url');
+import http from 'node:http';
+import https from 'node:https';
+import fs from 'node:fs';
+import { URL } from 'node:url';
 
 try {
     const envText = fs.readFileSync('.env', 'utf8');
@@ -72,7 +72,7 @@ function proxyImage(targetUrl, res, redirects = 0) {
 
         res.writeHead(200, {
             'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'no-store',
+            'Cache-Control': 'public, max-age=3600, s-maxage=86400',
             'Content-Type': contentType,
             'X-Content-Type-Options': 'nosniff'
         });
@@ -141,4 +141,4 @@ proxy.listen(PORT, () => {
     console.log(`Proxying requests to: ${WP_URL}`);
 });
 
-module.exports = proxy;
+export { proxy };
