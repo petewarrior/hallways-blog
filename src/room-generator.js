@@ -145,6 +145,7 @@ class RoomGenerator {
                 tangentX,
                 tangentZ,
                 apothem,
+                edgeLength,
                 width: openingWidth
             });
 
@@ -307,7 +308,7 @@ class RoomGenerator {
         addBox(`${frontWallOffset} ${height / 2} ${corridorEnd}`, [frontWallWidth, height, 0.12], '#85867F');
         addBox(`0 ${doorwayHeight + lintelHeight / 2} ${corridorEnd}`, [doorwayWidth, lintelHeight, 0.12], '#85867F');
 
-        const textY = Math.min(3.8, height * 0.48);
+        const textY = Math.min(3.8, height * 0.48) - 0.6;
         this.canvasPlane = document.createElement('a-plane');
         this.canvasPlane.setAttribute('position', `0 ${textY} ${backWallZ + 0.08}`);
         this.canvasPlane.setAttribute('width', '5.4');
@@ -347,7 +348,7 @@ class RoomGenerator {
             const side = index % 2 === 0 ? -1 : 1;
             const row = Math.floor(index / 2);
             const x = side * 5.45;
-            const y = height - 1.2 - rowStep * (row + 0.5);
+            const y = height - 1.8 - rowStep * (row + 0.5);
             const z = backWallZ + 1.1;
             const imageAvailable = image.available === true;
             const aspect = imageAvailable && Number.isFinite(image.aspect) && image.aspect > 0 ? image.aspect : 1.5;

@@ -124,7 +124,9 @@ class Navigation {
                 const distance = offsetX * boundary.normalX + offsetZ * boundary.normalZ;
                 const tangentDistance = offsetX * boundary.tangentX + offsetZ * boundary.tangentZ;
                 const inOpening = boundary.width && Math.abs(tangentDistance) < boundary.width / 2 - 0.2;
-                if (distance > -0.34 && !inOpening) {
+                const withinWallSpan = boundary.edgeLength === undefined ||
+                    Math.abs(tangentDistance) <= boundary.edgeLength / 2 + 0.34;
+                if (distance > -0.34 && withinWallSpan && !inOpening) {
                     position.x = previousX;
                     position.z = previousZ;
                     this.rig.object3D.updateMatrixWorld(true);
