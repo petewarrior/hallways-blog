@@ -19,6 +19,7 @@ class Navigation {
         this.registeredRooms = new Map();
         this.transitionCallbacks = [];
         this.keys = new Set();
+        this.touchPitchY = null;
         this.previousDistances = new Map();
         this.prewarmedDoorway = null;
         this.corridorEnd = null;
@@ -42,6 +43,29 @@ class Navigation {
         });
         document.addEventListener('keyup', e => this.keys.delete(e.key.toLowerCase()));
         window.addEventListener('blur', () => this.keys.clear());
+
+        const canvas = this.camera.sceneEl.canvas;
+        this.onTouchStart = event => {
+            this.touchPitchY = event.touches.length === 1 ? event.touches[0].pageY : null;
+        };
+        this.onTouchMove = event => {
+            if (this.touchPitchY === null || event.touches.length !== 1) return;
+            const touchY = event.touches[0].pageY;
+            const deltaY = touchY - this.touchPitchY;
+            this.touchPitchY = touchY;
+
+            const lookControls = this.camera.components['look-controls'];
+            if (!lookControls?.isPlaying || !lookControls.data.enabled) return;
+            const direction = lookControls.data.reverseTouchDrag ? 1 : -1;
+            lookControls.pitchObject.rotation.x += deltaY * 0.002 * direction;
+        };
+        this.onTouchEnd = () => {
+            this.touchPitchY = null;
+        };
+        canvas.addEventListener('touchstart', this.onTouchStart, { passive: true });
+        window.addEventListener('touchmove', this.onTouchMove, { passive: true });
+        window.addEventListener('touchend', this.onTouchEnd, { passive: true });
+        window.addEventListener('touchcancel', this.onTouchEnd, { passive: true });
     }
 
     startPositionCheck() {
@@ -68,7 +92,8 @@ class Navigation {
 
         const offset = new THREE.Vector3(cameraPosition.x, 0, cameraPosition.z)
             .applyQuaternion(this.rig.object3D.quaternion);
-        this.camera.setAttribute('position', `0 ${cameraPosition.y} 0`);
+        cameraPosition.x = 0;
+        cameraPosition.z = 0;
         return offset;
     }
 
@@ -278,6 +303,10 @@ class Navigation {
     destroy() {
         clearInterval(this.positionTimer);
         this.keys.clear();
+        this.camera.sceneEl.canvas.removeEventListener('touchstart', this.onTouchStart);
+        window.removeEventListener('touchmove', this.onTouchMove);
+        window.removeEventListener('touchend', this.onTouchEnd);
+        window.removeEventListener('touchcancel', this.onTouchEnd);
     }
 
     onRoomTransition(callback) {
